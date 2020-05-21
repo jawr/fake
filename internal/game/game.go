@@ -170,20 +170,29 @@ DRAW:
 
 		op := &ebiten.DrawImageOptions{}
 
-		w, h := img.Size()
-
 		// handle rotations
 		switch g.grid[i].direction {
 		case directionUp:
+			w, h := img.Size()
+
+			// move center of image to the origin 0,0
 			op.GeoM.Translate(-float64(w)/2, -float64(h)/2)
 			op.GeoM.Rotate(float64(90%360) * 2 * math.Pi / 360)
+			// reset the center of the image to the top left of the image
+			op.GeoM.Translate(float64(w)/2, float64(h)/2)
 
 		case directionRight:
-			op.GeoM.Scale(-1, 1)
+			// op.GeoM.Scale(-1, 1)
+			w, h := img.Size()
+			op.GeoM.Translate(-float64(w)/2, -float64(h)/2)
+			op.GeoM.Rotate(float64(180%360) * 2 * math.Pi / 360)
+			op.GeoM.Translate(float64(w)/2, float64(h)/2)
 
 		case directionDown:
+			w, h := img.Size()
 			op.GeoM.Translate(-float64(w)/2, -float64(h)/2)
 			op.GeoM.Rotate(float64(270%360) * 2 * math.Pi / 360)
+			op.GeoM.Translate(float64(w)/2, float64(h)/2)
 		}
 
 		op.GeoM.Translate(x, y)
