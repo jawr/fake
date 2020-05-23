@@ -17,6 +17,8 @@ func init() {
 
 var ErrGameOver = fmt.Errorf("Game Over")
 
+const foodPoints = 100
+
 const cellSize = 32
 
 type cellType int
@@ -49,8 +51,9 @@ const (
 )
 
 type cell struct {
-	current   cellType
-	direction direction
+	current       cellType
+	direction     direction
+	nextDirection direction
 }
 
 type Game struct {
@@ -62,9 +65,11 @@ type Game struct {
 	grid       []*cell
 	rows, cols int
 
-	fox, head, body, tail *ebiten.Image
+	fox, head, body, bodyTurnBig, bodyTurnLittle, tail *ebiten.Image
 
 	direction direction
+
+	score int
 }
 
 func NewGame(screenWidth, screenHeight int) (*Game, error) {
@@ -75,6 +80,14 @@ func NewGame(screenWidth, screenHeight int) (*Game, error) {
 		return nil, errors.WithMessage(err, "head")
 	}
 	body, _, err := ebitenutil.NewImageFromFile("./assets/body.png", ebiten.FilterDefault)
+	if err != nil {
+		return nil, errors.WithMessage(err, "body")
+	}
+	bodyTurnBig, _, err := ebitenutil.NewImageFromFile("./assets/body-turn-big.png", ebiten.FilterDefault)
+	if err != nil {
+		return nil, errors.WithMessage(err, "body")
+	}
+	bodyTurnLittle, _, err := ebitenutil.NewImageFromFile("./assets/body-turn-little.png", ebiten.FilterDefault)
 	if err != nil {
 		return nil, errors.WithMessage(err, "body")
 	}
@@ -110,7 +123,11 @@ func NewGame(screenWidth, screenHeight int) (*Game, error) {
 		cols: cols,
 
 		head: head,
-		body: body,
+
+		body:           body,
+		bodyTurnBig:    bodyTurnBig,
+		bodyTurnLittle: bodyTurnLittle,
+
 		tail: tail,
 		fox:  food,
 	}
@@ -145,6 +162,7 @@ func (g *Game) Update(screen *ebiten.Image) error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+
 	var img *ebiten.Image
 
 DRAW:
@@ -158,6 +176,32 @@ DRAW:
 
 		case cellTypeBody:
 			img = g.body
+
+			if g.grid[i].direction != g.grid[i].nextDirection {
+				var clockwise bool
+
+				d := g.grid[i].direction
+				n := g.grid[i].nextDirection
+
+				switch {
+				case d == directionUp && n == directionRight:
+					fallthrough
+				case d == directionRight && n == directionDown:
+					fallthrough
+				case d == directionDown && n == directionLeft:
+					fallthrough
+				case d == directionLeft && n == directionUp:
+					clockwise = true
+				}
+
+				// clockwise is a big turn
+				if clockwise {
+					img = g.bodyTurnLittle
+				} else {
+					// counter clockwise is a little turn
+					img = g.bodyTurnBig
+				}
+			}
 
 		case cellTypeTail:
 			img = g.tail
@@ -255,6 +299,8 @@ SNAKE:
 			return ErrGameOver
 
 		case collisionTypeFood:
+			g.score += foodPoints
+
 			// food becomes the head
 			g.snake = append(g.snake, g.food)
 			g.grid[g.food].current = cellTypeHead
@@ -271,6 +317,7 @@ SNAKE:
 			break
 		}
 
+		nextDirection := direction
 		if lastCell.direction != directionNone {
 			direction = lastCell.direction
 		}
@@ -279,6 +326,7 @@ SNAKE:
 		// move segment
 		g.grid[next].direction = direction
 		g.grid[next].current = g.grid[current].current
+		g.grid[next].nextDirection = nextDirection
 
 		// remove previous
 		g.grid[current].direction = directionNone
@@ -312,6 +360,11 @@ func (g *Game) nextCell(idx int, direction direction) (int, collisionType) {
 		return 0, collisionTypeWall
 	}
 
+	// dont allow to bump in to score line
+	if next <= g.cols {
+		return 0, collisionTypeWall
+	}
+
 	switch g.grid[next].current {
 	case cellTypeFood:
 		return next, collisionTypeFood
@@ -341,7 +394,7 @@ func (g *Game) initSnake() {
 
 func (g *Game) initFood() error {
 	for i := 0; i < len(g.grid)*2; i++ {
-		col := rand.Intn(len(g.grid) - 1)
+		col := rand.Intn(len(g.grid)-g.cols-1) + g.cols
 		if g.grid[col].current == cellTypeEmpty {
 			g.food = col
 			g.grid[col].current = cellTypeFood
