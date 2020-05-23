@@ -163,6 +163,9 @@ func (g *Game) Update(screen *ebiten.Image) error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
+	// draw score
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("Score: %50d", g.score))
+
 	var img *ebiten.Image
 
 DRAW:
